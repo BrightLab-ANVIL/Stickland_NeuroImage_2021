@@ -34,8 +34,8 @@ end_exp_key = 'escape'
 
 ### Fixation.py
 
-RestDuration = 480  # duration of the resting block in seconds \
-end_exp_key = 'escape'  # key to press to end the experiment prematurely
+RestDuration = 480  \
+end_exp_key = 'escape'
 
 ## Analysis Code (in this repo)
 
