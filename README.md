@@ -10,22 +10,11 @@ scan_trigger = 5; doRest = 2; tResting = 480 ; trialnum = 3; tPace = 24 ; tBreat
 
 ### Cued_Deep_Breathing.py
 
-scan_trigger = 5  \
-doRest = 2  \
-tResting = 480   \
-trialnum = 2    \
-tStartRest = 28    \
-tGetReady = 2   \
-tCDB = 8    \
-tCDBPace = 4    \
-tFree = 43    \
-CDB_instructions = 'DEEP BREATHING task \n \nTake deep breaths IN and OUT when cued \n \nBreathe through your nose' \
-end_exp_key = 'escape'
+scan_trigger = 5; doRest = 2; tResting = 480; trialnum = 2; tStartRest = 28; tGetReady = 2; tCDB = 8; tCDBPace = 4; tFree = 43; CDB_instructions = 'DEEP BREATHING task \n \nTake deep breaths IN and OUT when cued \n \nBreathe through your nose'; end_exp_key = 'escape'
 
 ### Fixation.py
 
-RestDuration = 480  \
-end_exp_key = 'escape'
+RestDuration = 480; end_exp_key = 'escape'
 
 ## Analysis Code (in this repo)
 
