@@ -6,17 +6,7 @@
 
 ### Breath_Hold.py
 
-scan_trigger = 5  \
-doRest = 2  \
-tResting = 480    \
-trialnum = 3    \
-tPace = 24    \
-tBreathPace = 6    \
-tHold = 15    \
-tExhale = 2    \
-tRecover = 4    \
-BH_instructions = 'BREATH-HOLD task \n \nFollow the breathing instructions \n \nBreathe through your nose' \
-end_exp_key = 'escape'
+scan_trigger = 5; doRest = 2; tResting = 480 ; trialnum = 3; tPace = 24 ; tBreathPace = 6; tHold = 15; tExhale = 2; tRecover = 4; BH_instructions = 'BREATH-HOLD task \n \nFollow the breathing instructions \n \nBreathe through your nose'; end_exp_key = 'escape'
 
 ### Cued_Deep_Breathing.py
 
