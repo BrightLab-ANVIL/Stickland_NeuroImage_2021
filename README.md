@@ -1,6 +1,5 @@
-Stickland_2021 \
-A practical modification to a resting state fMRI protocol for improved characterization of cerebrovascular function \
-DOI: https://doi.org/10.1101/2021.02.15.431289
+*A practical modification to a resting state fMRI protocol for improved characterization of cerebrovascular function \
+DOI: https://doi.org/10.1101/2021.02.15.431289*
 
 ## BREATHING TASK CODE: https://github.com/RayStick/BreathingTasks_PsychoPy
 
@@ -111,7 +110,7 @@ Inputs 11 = 1.2
 
 (x.3dDeconvolve_shifts was not run, but is an alternative to x.3dREMLfit_shifts)
 
-### Step 6 - GLM_CO2shifts/Threshold_Maps
+### Step 6 - GLM_CO2shifts/x.Threshold_Maps
 
 Ran the code for each each data segment.
 
