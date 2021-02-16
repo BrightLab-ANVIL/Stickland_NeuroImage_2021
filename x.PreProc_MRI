@@ -1,0 +1,135 @@
+#!/bin/sh
+
+# x.PreProc_MRI
+
+# INPUT FILES (DICOMS converted to NIFTI, and renamed):
+# sub-X_T1w.nii.gz
+# sub-X_task-rest_acq-mb4_bold_SBRef.nii.gz
+# sub-X_task-rest_acq-mb4_bold.nii.gz
+# sub-X_task-BH_acq-mb4_bold_SBRef.nii.gz
+# sub-X_task-BH_acq-mb4_bold.nii.gz
+# sub-X_task-CDB_acq-mb4_bold_SBRef.nii.gz
+# sub-X_task-CDB_acq-mb4_bold.nii.gz
+
+# SOFTWARE :
+# FSL (6.0.1)
+# AFNI (AFNI_19.1.06 'Caligula')
+
+#define inputs to the function
+orig_data_dir=${1:-'.'} #path to the directory that contains the input files (organized into directories per subject i.e. 'sub-01')
+output_dir=${2:-'./output'} #path to the output directory.
+middle_scan_file=${3:-./MIDDLE_SCAN_LIST_static} #path to a file that lists which scan was the middle scan for each subject (one row per subject)
+pve_thr=${4:-75} #partial volume threshold to use for the tissue masks.
+tissue_masks=${5:-1} #make tissue masks and brain mask, 1=yes, 0=no
+tissue_masks_SBRef=${6:-1} #make tissue masks in  SBRef space,  1=yes, 0=no. Requires tissue_masks to have been run.
+BOLD_fMRI=${7:-1} #volreg, bet and mean-ts for each BOLD fMRI file,  1=yes, 0=no. Requires tissue_masks and tissue_masks_SBRef to have been run.
+
+subject_list=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
+task_list=("BH" "CDB" "rest") #list of tasks to run
+tissue_list=("GM") #list of tissue masks to transform to subject space e.g. ('GM' 'WM' 'CSF')
+
+if_missing_mkdir() {
+if [ ! -d $1 ]
+then
+    echo "$1 is missing, creating it."
+    mkdir $1
+fi
+}
+
+###############################################################################
+###################################### RUN ####################################
+###############################################################################
+
+if_missing_mkdir ${output_dir}
+
+for subject_line in "${subject_list[@]}"; do
+
+  MIDDLE_SCAN=$(sed -n ${subject_line}p ${middle_scan_file})
+
+  subject="sub-${subject_line}"
+  subject_orig_data_dir="${orig_data_dir}/${subject}"
+  subject_output_dir="${output_dir}/${subject}"
+
+  if_missing_mkdir ${subject_output_dir}
+
+  # Tissue masks #
+  ################
+
+  if [ "${tissue_masks}" -eq 1 ]
+  then
+
+    echo "Running BET on the middle SBRef file"
+    echo "-------------------------------------------------"
+    BOLD_SBRef_file="${subject_orig_data_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef.nii.gz"
+    bet "${BOLD_SBRef_file}.nii.gz" "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet.nii.gz" -m -F -R #check the output for each subject - these parameters may need to be tweaked
+    fslmaths "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet.nii.gz"  -ero "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet_ero.nii.gz"
+    fslmaths "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet_ero.nii.gz"  -bin "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet_ero_mask.nii.gz"
+
+    echo "Running fsl_anat on the T1-w file"
+    echo "---------------------------------"
+    fsl_anat -i ${orig_data_dir}/${subject}/${subject}_T1w.nii.gz -o ${subject_output_dir}/${subject}
+
+    echo "Making tissue masks based on the pve images"
+    echo "-------------------------------------------"
+    fslmaths "${subject_output_dir}/${subject}.anat/T1_fast_pve_0.nii.gz" -thr 0.${pve_thr} -bin "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_CSF-MASK${pve_thr}.nii.gz"
+    fslmaths "${subject_output_dir}/${subject}.anat/T1_fast_pve_1.nii.gz" -thr 0.${pve_thr} -bin "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_GM-MASK${pve_thr}.nii.gz"
+    fslmaths "${subject_output_dir}/${subject}.anat/T1_fast_pve_2.nii.gz" -thr 0.${pve_thr} -bin "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_WM-MASK${pve_thr}.nii.gz"
+
+  fi
+
+  # Tissue masks in SBRef space #
+  ###############################
+
+  if [ "${tissue_masks_SBRef}" -eq 1 ]
+  then
+
+    echo "Registering SBRef to T1-w (and saving matrix inverse)"
+    echo "-----------------------------------------------------"
+    flirt -in "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet_ero.nii.gz" -ref "${subject_output_dir}/${subject}.anat/T1_biascorr_brain.nii.gz" -omat "${subject_output_dir}/${subject}_SBRef_to_T1w.mat" -dof 6
+    convert_xfm -omat "${subject_output_dir}/${subject}_T1w_to_SBRef.mat" -inverse "${subject_output_dir}/${subject}_SBRef_to_T1w.mat"
+
+    echo "Transforming tissue masks to SBRef space"
+    echo "----------------------------------------"
+    for tissue_class in "${tissue_list[@]}"; do
+      flirt -in "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}.nii.gz" -ref "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet_ero.nii.gz" -applyxfm -init "${subject_output_dir}/${subject}_T1w_to_SBRef.mat" -out "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}_SBRef.nii.gz" -dof 6
+      # Threshold the mask afterwards (https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FLIRT/FAQ#How_do_I_transform_a_mask_with_FLIRT_from_one_space_to_another.3F)
+      fslmaths "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}_SBRef.nii.gz" -thr 0.5 -bin "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}_SBRef.nii.gz"
+    done #end tissue_class loop\
+
+  fi
+
+  # BOLD-fMRI #
+  #############
+
+  if [ "${BOLD_fMRI}" -eq 1 ]
+  then
+
+    for task in "${task_list[@]}"; do
+      task_file="${subject}_task-${task}_acq-mb4_bold"
+      BOLD_SBRef_file="${subject_orig_data_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef.nii.gz"
+
+      echo "Running 3dvolreg for ${task} with SBRef file as base"
+      echo "----------------------------------------------------"
+      3dvolreg -dfile "${subject_output_dir}/${task_file}_mc.1D" -base ${BOLD_SBRef_file}[0] -maxdisp1D "${subject_output_dir}/${task_file}_mc_maxdisp.1D" \
+      -prefix "${subject_output_dir}/${task_file}_mc.nii.gz" "${subject_orig_data_dir}/${task_file}.nii.gz"
+      #Demean the saved motion parameters
+      1d_tool.py -infile "${subject_output_dir}/${task_file}_mc.1D"[1..6] -demean -write "${subject_output_dir}/${task_file}_mc_demean.1D"
+
+      echo "Masking ${task} file with SBRef brain mask"
+      echo "------------------------------------------"
+      3dcalc -a "${subject_output_dir}/${task_file}_mc.nii.gz" -b "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet_ero_mask.nii.gz" \
+      -expr "a*b" -prefix "${subject_output_dir}/${task_file}_mc_brain.nii.gz"
+
+      echo "Output a BOLD mean-ts across each tissue mask"
+      echo "---------------------------------------------"
+      for tissue_class in "${tissue_list[@]}"; do
+        fslmeants -i "${subject_output_dir}/${task_file}_mc_brain.nii.gz" -o "${subject_output_dir}/${task_file}_mc_brain_${tissue_class}_MeanTS.txt" -m "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}_SBRef.nii.gz"
+      done
+      #over whole brain
+      fslmeants -i "${subject_output_dir}/${task_file}_mc_brain.nii.gz" -o "${subject_output_dir}/${task_file}_mc_brain_${tissue_class}_MeanTS.txt" -m "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet_ero_mask.nii.gz"
+
+    done #end task loop
+
+  fi
+
+done #end subject loop
