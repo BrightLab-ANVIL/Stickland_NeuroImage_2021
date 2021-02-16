@@ -2,9 +2,9 @@
 
 # A practical modification to a resting state fMRI protocol for improved characterization of cerebrovascular function
 
-# DOI: 
+# DOI: https://doi.org/10.1101/2021.02.15.431289
 
-## Breathing Task code: https://github.com/RayStick/BreathingTasks_PsychoPy
+## BREATHING TASK TO CODE: https://github.com/RayStick/BreathingTasks_PsychoPy
 
 ### Breath_Hold.py
 
@@ -18,7 +18,110 @@ scan_trigger = 5; doRest = 2; tResting = 480; trialnum = 2; tStartRest = 28; tGe
 
 RestDuration = 480; end_exp_key = 'escape'
 
-## Analysis Code (in this repo)
+## ANALYSIS CODE (THIS REPO)
 
-(to be updated soon)
+### Step 1 - x.PreProc_MRI
+
+Used the default options (except for input and output directories).
+
+### Step 2 - PreProc_PHYS/preprocess_physdata.m
+
+Ran three times for each data segment.
+
+inputfile_txt = physiological text file from the whole scan session \
+time_col = 1 \
+vol_col = 2 \
+sf = 1000 \
+TR = 1.2 \
+n_TRs = 534 (BH+REST) or 513 (CDB+REST) or 400 (REST) \
+prefix = subjectID_BHREST or subjectID_CDBREST or subjectID_REST \
+extra_TRs = 17 \
+inputfile_json = 0
+
+### Step 3 - PreProc_PHYS/calc_CO2_regressor.m
+
+Ran three times for each data segment.
+
+filename = output from Step 2 \
+fs = 1000 \
+vol_col = 1 \
+CO2_col = 2 \
+prefix = subjectID_BHREST or subjectID_CDBREST or subjectID_REST \
+HRFconv= 1 \
+output_hires = 1 \
+td = 0 \
+demean = 0 \
+peak_check = 1
+
+### Step 4 - PreProc_PHYS/Shift_hires_CO2regressor
+
+fMRI_file = input is the output from Step 1.
+CO2_file = input is the output from Step 3.
+
+Ran in five different ways to make five data segments of length 7 mins 50 seconds:
+
+1. Filename in 'BH+REST'; filename out 'BH+REST'; \
+cut_TRs_start=10; \
+cut_TRs_end=134;
+
+2. Filename in 'CDB+REST'; filename out 'CDB+REST'; \
+cut_TRs_start=10; \
+cut_TRs_end=113;
+
+3. Filename in 'BH+REST'; filename out 'rest_bh'; \
+cut_TRs_start=144; \
+cut_TRs_end=0;
+
+4. Filename in 'CDB+REST'; filename out 'rest_cdb'; \
+cut_TRs_start=123; \
+cut_TRs_end=0;
+
+5. Filename in 'rest'; filename out 'rest'; \
+cut_TRs_start=10; \
+cut_TRs_end=0;
+
+Remaining inputs (for the main analysis): \
+TR = 1.2 \
+extra_TRs_half = 17 \
+sf = 1000 \
+nf = 40 \
+bulk_shift = 0 \
+save_bulk_hires = 0 \
+fine_shift = 1 \
+save_fine_hires = 0 \
+shift_unit_s = 0.3 \
+shift_max_s = 15 \
+prefix = subjectID_BHREST_BH_CO2
+
+Also ran with bulk_shift=1 and fine_shift=0 to explore the bulk shift (Fig4).
+
+### Step 5  - GLM_CO2shifts/x.3dREMLfit_shifts
+
+Ran for each data segment, using the same start and end time defined in Step 4.
+
+Input 1 = Output directory of PreProc_MRI \
+Input 2 = Output file from PreProc_MRI \
+Input 3 = Output file from PreProc_MRI \
+Input 4 = Output file from PreProc_MRI \
+Input 5 = Output file from Shift_hires_CO2regressor \
+Input 6 = Output file from Shift_hires_CO2regressor (demeaned with 1d_tool.py) \
+Input 7 = 100 \
+Input 8 = 0.3 \
+Input 9 = 1 \
+Inputs 10 and 11 = Same start and end times specified for the 5 segments in Step 4 \
+Inputs 11 = 1.2
+
+(x.3dDeconvolve_shifts was not run, but is an alternative to x.3dREMLfit_shifts)
+
+### Step 6 - GLM_CO2shifts/Threshold_Maps
+
+Ran the code for each each data segment.
+
+Input 1 = Output directory (Concat_3dREMLfit) from Step 5 \
+Input 2 = File prefix used for the output files from Step 5 \
+Input 3 = Output file from PreProc_MRI \
+Input 4 = Output file from PreProc_MRI \
+Input 5 = 5.1280e-04 \
+Input 6 = 390
+
 
