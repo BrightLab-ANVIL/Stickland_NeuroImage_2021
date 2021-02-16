@@ -4,7 +4,7 @@
 
 # DOI: https://doi.org/10.1101/2021.02.15.431289
 
-## BREATHING TASK TO CODE: https://github.com/RayStick/BreathingTasks_PsychoPy
+## BREATHING TASK CODE: https://github.com/RayStick/BreathingTasks_PsychoPy
 
 ### Breath_Hold.py
 
