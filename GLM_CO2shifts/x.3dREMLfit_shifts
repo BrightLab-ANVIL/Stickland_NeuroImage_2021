@@ -1,0 +1,285 @@
+#!/bin/bash
+
+# x.3dREMLfit_shifts
+
+# Run 3dREMLfit for one subject and one scan, looping over each CO2 shift
+# Create lag maps, lag-clipped maps, CVR maps and optCVR maps (not statistically thesholded)
+# This code has a set design matrix that includes these regressors: 6 motion parmeters, CO2 regressor and polort 0-4
+# Only the mean (polort 0) makes up the baseline model
+# This code assumes that the number of CO2 shifts will be less than 1000. If you're doing more than that ... probably don't.
+
+if_missing_mkdir() {
+if [ ! -d $1 ]
+then
+    echo "$1 is missing, creating it."
+    mkdir $1
+fi
+}
+
+if [ $# -lt 6 ]
+then
+    echo "************************************************************************************************************"
+    echo "Insufficient arguments supplied"
+    echo "Input 1 (required) should be the directory containing the fMRI input file and the motion parameter file"
+    echo "Input 2 (required) should be the name of the fMRI input file (assumes NIFTI)"
+    echo "Input 3 (required) should be the name of the 6 column demeaned motion parameter file (assumes 1D)"
+    echo "Input 4 (required) should be the full path to the brain mask (assumes NIFTI)"
+    echo "Input 5 (required) should be the directory containing the CO2 input file"
+    echo "Input 6 (required) should be the name of the demeaned CO2 input file (assumes 1D)"
+    echo "Input 7 should be the total number of CO2 shifts (indexing starting at 0). Deafult = 100"
+    echo "Input 8 should be the CO2 shift unit in seconds. Default = 0.3"
+    echo "Input 9 should be the number of CO2 shifts to include as a boundary condition MINUS ONE. Default = 1. "
+    echo "Input 10 should be the fMRI start volume (indexing starting at 0). Default = 10."
+    echo "Input 11 should be the fMRI end volume (indexing starting at 0). Default = 390"
+    echo "Input 12 should be the TR (in seconds). Default = 1.2"
+    echo "Input 13 should be the output directory for created files. Default = pwd/output"
+    echo "Note: do not include file extensions"
+    echo "*************************************************************************************************************"
+    exit
+fi
+
+#define inputs to the function
+fMRI_dir=${1}
+fMRI_file=${2}
+motion_file=${3}
+brain_mask_file=${4}
+CO2_dir=${5}
+CO2_file=${6}
+CO2_shifts=${7:-100}
+CO2_shift_unit=${8:-0.3}
+CO2_shift_boundary=${9:-1}
+start=${10:-10}
+end=${11:-399}
+TR=${12:-1.2}
+output_dir=${13:-'./output'}
+
+#define some parameters
+CO2_middle_shift=$((CO2_shifts/2))
+CO2_middle_shift_index=$((CO2_middle_shift+1))
+if [ "${CO2_middle_shift}" -ge "10" ]
+then
+  lz="00"
+fi
+
+if [ "${CO2_middle_shift}" -ge "100" ]
+then
+  lz="0"
+fi
+
+CO2_middle_shift_lz=${lz}${CO2_middle_shift}
+CO2_lower_shift=$((CO2_shift_boundary+2))
+CO2_upper_shift=$((CO2_shifts-CO2_shift_boundary))
+
+echo "-------------------------------------------------------------------"
+echo "CO2 middle shift is ${CO2_middle_shift}"
+echo "CO2 middle shift with lz is ${CO2_middle_shift_lz}"
+echo "After clippling, CO2 shifts from ${CO2_lower_shift} to ${CO2_upper_shift} will remain"
+echo "-------------------------------------------------------------------"
+
+#Output directories that will be needed later
+if_missing_mkdir ${output_dir}
+if_missing_mkdir "${output_dir}/ModelOutput"
+if_missing_mkdir "${output_dir}/BetaOutput"
+if_missing_mkdir "${output_dir}/VarOutput"
+
+##############################
+# 3dREMLfit across shifts #
+##############################
+
+#Create text file for easy progress tracking
+if [ ! -f ${output_dir}/progress_update.txt ]
+then
+  touch ${output_dir}/progress_update.txt
+fi
+
+lz="000" #leading zero file-naming
+i=0
+
+while [ $i -le ${CO2_shifts} ]
+do
+
+  #leading zero file-naming
+  if [ "${i}" == "10" ]
+  then
+    lz="00"
+  fi
+
+  if [ "${i}" == "100" ]
+  then
+    lz="0"
+  fi
+
+  #check if output files exist. If not, run the command.
+  if [[ ! -f "${output_dir}/ModelOutput/${fMRI_file}_3dREMLfit_${lz}${i}.nii.gz" || ! -f "${output_dir}/VarOutput/${fMRI_file}_3dREMLfit_var_${lz}${i}.nii.gz" || ! -f "${output_dir}/BetaOutput/${fMRI_file}_3dREMLfit_Beta_${lz}${i}.nii.gz"  ]]
+  then
+
+    #progress tracking
+    echo "-------------------------------------------------------------------"
+    echo "Running 3dREMLfit for ${fMRI_file} and shift ${i}"
+    echo "-------------------------------------------------------------------"
+    echo "------ $(date) ------" >> ${output_dir}/progress_update.txt
+    echo "Running 3dREMLfit for ${fMRI_file} and shift ${i}" >> ${output_dir}/progress_update.txt
+
+    #First make the matrix by running 3dDeconvolve with no nodata
+    n_vols=$((end-start+1))
+    3dDeconvolve -polort 4 -nodata ${n_vols} ${TR} -x1D ${output_dir}/polort_matrix_${fMRI_file}.1D
+    mat_file=${output_dir}/polort_matrix_${fMRI_file}.1D
+    3dDeconvolve -input "${fMRI_dir}/${fMRI_file}.nii.gz"[${start}..${end}] -polort 0 -bout -num_stimts 11 \
+    -stim_file 1 "${fMRI_dir}/${motion_file}.1D[0]{${start}..${end}}" -stim_label 1 roll \
+    -stim_file 2 "${fMRI_dir}/${motion_file}.1D[1]{${start}..${end}}" -stim_label 2 pitch \
+    -stim_file 3 "${fMRI_dir}/${motion_file}.1D[2]{${start}..${end}}" -stim_label 3 yaw \
+    -stim_file 4 "${fMRI_dir}/${motion_file}.1D[3]{${start}..${end}}" -stim_label 4 dS \
+    -stim_file 5 "${fMRI_dir}/${motion_file}.1D[4]{${start}..${end}}" -stim_label 5 dL \
+    -stim_file 6 "${fMRI_dir}/${motion_file}.1D[5]{${start}..${end}}" -stim_label 6 dP \
+    -stim_file 7 "${mat_file}[1]" -stim_label 7 polort1 \
+    -stim_file 8 "${mat_file}[2]" -stim_label 8 polort2 \
+    -stim_file 9 "${mat_file}[3]" -stim_label 9 polort3 \
+    -stim_file 10 "${mat_file}[4]" -stim_label 10 polort4 \
+    -stim_file 11 "${CO2_dir}/${CO2_file}.1D[${i}]" -stim_label 11 CO2 \
+    -nodata ${n_vols} ${TR} -x1D "${output_dir}/matrix_${fMRI_file}_${lz}${i}.1D"
+
+    #Now run 3dREMLfit
+    3dREMLfit -matrix "${output_dir}/matrix_${fMRI_file}_${lz}${i}.1D" -input "${fMRI_dir}/${fMRI_file}.nii.gz"[${start}..${end}] -fout -tout -rout \
+    -Rbuck ${output_dir}/ModelOutput/${fMRI_file}_3dREMLfit_${lz}${i}.nii.gz \
+    -Rvar ${output_dir}/VarOutput/${fMRI_file}_3dREMLfit_var_${lz}${i}.nii.gz \
+    -Rbeta ${output_dir}/BetaOutput/${fMRI_file}_3dREMLfit_Beta_${lz}${i}.nii.gz \
+    -verb
+  else
+    echo "-------------------------------------------------------------------"
+    echo "ALREADY RUN 3dREMLfit for ${fMRI_file} at shift ${i}"
+    echo "-------------------------------------------------------------------"
+    echo "------ $(date) ------" >> ${output_dir}/progress_update.txt
+    echo "ALREADY RUN 3dREMLfit for ${fMRI_file} and shift ${i}" >> ${output_dir}/progress_update.txt
+
+  fi
+
+i=$((i + 1))
+done
+
+##################################
+# Indexing needed for next steps #
+##################################
+FullRsq=0
+MeanCoef=0 #in ${fMRI_file}_3dREMLfit_Beta_${lz}${i}.nii.gz
+numvols=$( 3dinfo -nv "${output_dir}/ModelOutput/${fMRI_file}_3dREMLfit_0000.nii.gz" )
+CO2Tstat=$((numvols-3)) #remember AFNI indexing!
+CO2Coef=$((numvols-4)) #remember AFNI indexing!
+
+############################################
+# Concatenate statistics across CO2 SHIFTS #
+############################################
+
+concat_output_dir="${output_dir}/Concat_3dREMLfit"
+if_missing_mkdir ${concat_output_dir}
+
+if [[ ! -f "${concat_output_dir}/${fMRI_file}_CO2-Coef.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_CO2-Tstat.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_Mean-Coef.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_Rsq.nii.gz" ]]
+then
+
+  echo "-------------------------------------------------------------------"
+  echo "Concatenating Full-R2, Mean-Coef, CO2-Tstat and CO2-Coef across shifts, for ${fMRI_file}"
+  echo "-------------------------------------------------------------------"
+  echo "Concatenating Full-R2, Mean-Coef, CO2-Tstat and CO2-Coef across shifts, for ${fMRI_file}}" >> ${concat_output_dir}/progress_update.txt
+
+  #Concatenate Model Rsq, Model Mean, CO2 Tstat and CO2 Coef across shifts
+  3dTcat -DAFNI_GLOB_SELECTORS=YES -relabel -prefix "${concat_output_dir}/${fMRI_file}_Rsq.nii.gz" "${output_dir}/ModelOutput/${fMRI_file}_3dREMLfit_*.nii.gz[${FullRsq}]"
+  3dTcat -DAFNI_GLOB_SELECTORS=YES -relabel -prefix "${concat_output_dir}/${fMRI_file}_Mean-Coef.nii.gz" "${output_dir}/BetaOutput/${fMRI_file}_3dREMLfit_Beta_*.nii.gz[${MeanCoef}]"
+  3dTcat -DAFNI_GLOB_SELECTORS=YES -relabel -prefix "${concat_output_dir}/${fMRI_file}_CO2-Tstat.nii.gz" "${output_dir}/ModelOutput/${fMRI_file}_3dREMLfit_*.nii.gz[${CO2Tstat}]"
+  3dTcat -DAFNI_GLOB_SELECTORS=YES -relabel -prefix "${concat_output_dir}/${fMRI_file}_CO2-Coef.nii.gz" "${output_dir}/ModelOutput/${fMRI_file}_3dREMLfit_*.nii.gz[${CO2Coef}]"
+
+else
+   echo "-------------------------------------------------------------------"
+   echo "ALREADY concatenated Full-R2, Mean-Coef, CO2-Tstat and CO2-Coef across shifts, for ${fMRI_file}"
+   echo "-------------------------------------------------------------------"
+   echo "ALREADY concatenated Full-R2, Mean-Coef, CO2-Tstat and CO2-Coef across shifts, for ${fMRI_file}" >> ${concat_output_dir}/progress_update.txt
+fi
+
+# From this point on, in the code, you only need the 4 concatenated files that were made above (and the brain mask) #
+
+####################################
+# Make CVR map (not lag optimized) #
+####################################
+
+if [[ ! -f "${concat_output_dir}/${fMRI_file}_perCVR_NoShift.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_CO2-Tstat_NoShift.nii.gz" ]]
+then
+  echo "-------------------------------------------------------------------"
+  echo "Making CVR maps (not lag optimized) for ${fMRI_file}"
+  echo "-------------------------------------------------------------------"
+  echo "Making CVR maps (not lag optimized) for ${fMRI_file}" >> ${concat_output_dir}/progress_update.txt
+  #Make percent CVR map at no shift (Coef/Mean*100) + mask to brain
+  3dcalc -a "${concat_output_dir}/${fMRI_file}_CO2-Coef.nii.gz[${CO2_middle_shift}]" -b "${concat_output_dir}/${fMRI_file}_Mean-Coef.nii.gz[${CO2_middle_shift}]" \
+  -c ${brain_mask_file} -expr "((a/b)*100)*c" -prefix "${concat_output_dir}/${fMRI_file}_perCVR_NoShift.nii.gz"
+  #Save out CO2-Tstat at no shift + mask to brain
+  3dcalc -a "${concat_output_dir}/${fMRI_file}_CO2-Tstat.nii.gz[${CO2_middle_shift}]" -b ${brain_mask_file} -expr "a*b" -prefix "${concat_output_dir}/${fMRI_file}_CO2-Tstat_NoShift.nii.gz"
+else
+  echo "-------------------------------------------------------------------"
+  echo "ALREADY made CVR maps (not lag optimized) for ${fMRI_file}"
+  echo "-------------------------------------------------------------------"
+  echo "ALREADY made CVR maps (not lag optimized) for ${fMRI_file}" >> ${concat_output_dir}/progress_update.txt
+
+fi
+
+################
+# Make Lag map #
+################
+
+if [[ ! -f "${concat_output_dir}/${fMRI_file}_Rsq_MAXid1.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_Rsq_MAXid1_ClipMASK.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_Lag_Sec_inv.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_Lag_Sec_inv_Clip.nii.gz" ]]
+then
+  echo "-------------------------------------------------------------------"
+  echo "Making lag maps for ${fMRI_file}"
+  echo "-------------------------------------------------------------------"
+  echo "Making lag maps for ${fMRI_file}" >> ${concat_output_dir}/progress_update.txt
+  #Get the max-index of the Rsq across shifts
+  3dTstat -argmax1  -prefix "${concat_output_dir}/${fMRI_file}_Rsq_MAXid1.nii.gz" "${concat_output_dir}/${fMRI_file}_Rsq.nii.gz" #using -argmax1 so zero voxels only indicate outside of the brain
+  #Get a mask without boundary conditions + mask to brain
+  3dcalc -a "${concat_output_dir}/${fMRI_file}_Rsq_MAXid1.nii.gz" -b ${brain_mask_file} \
+  -expr "(within(a,${CO2_lower_shift},${CO2_upper_shift}))*b" -prefix "${concat_output_dir}/${fMRI_file}_Rsq_MAXid1_ClipMASK.nii.gz"
+  #Lag Map - Convert to seconds and multiple by -1 to make inverse maps (as this is more intuitive) + mask to brain
+  3dcalc -a "${concat_output_dir}/${fMRI_file}_Rsq_MAXid1.nii.gz" -b ${brain_mask_file} \
+  -expr "(((a-${CO2_middle_shift_index})*${CO2_shift_unit})*-1)*b" -prefix "${concat_output_dir}/${fMRI_file}_Lag_Sec_inv.nii.gz"
+  #Lag Map - Convert to seconds, mask out boundary voxels and multiple by -1 to make inverse maps (as this is more intuitive) + mask to brain
+  3dcalc -a "${concat_output_dir}/${fMRI_file}_Rsq_MAXid1.nii.gz" -b "${concat_output_dir}/${fMRI_file}_Rsq_MAXid1_ClipMASK.nii.gz" \
+  -c ${brain_mask_file} -expr "((((a-${CO2_middle_shift_index})*${CO2_shift_unit})*b)*-1)*c" -prefix "${concat_output_dir}/${fMRI_file}_Lag_Sec_inv_Clip.nii.gz"
+else
+  echo "-------------------------------------------------------------------"
+  echo "ALREADY made lag maps for ${fMRI_file}"
+  echo "-------------------------------------------------------------------"
+  echo "ALREADY made lag maps for ${fMRI_file}" >> ${concat_output_dir}/progress_update.txt
+fi
+
+################################
+# Make CVR map (lag optimized) #
+################################
+
+if [[ ! -f "${concat_output_dir}/${fMRI_file}_CO2-Tstat_OptShift.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_CO2-Coef_OptShift.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_Mean-Coef_OptShift.nii.gz" ]]
+then
+  echo "-------------------------------------------------------------------"
+  echo "Finding CO2-Coef and Mean-Coef at opt shift for ${fMRI_file}"
+  echo "-------------------------------------------------------------------"
+  echo "Finding CO2-Coef and Mean-Coef at opt shift for ${fMRI_file}" >> ${concat_output_dir}/progress_update.txt
+  #Eventually - try to replace this MATLAB code with just BASH/FSL/AFNI commands to match the rest of the code.
+  matlab -nodesktop -r "CVRfiles_LagIndex('${fMRI_file}','${concat_output_dir}','${concat_output_dir}');"
+else
+  echo "-------------------------------------------------------------------"
+  echo "ALREADY found CO2-Coef and Mean-Coef at opt shift for ${fMRI_file}"
+  echo "-------------------------------------------------------------------"
+  echo "ALREADY found CO2-Coef and Mean-Coef at opt shift for ${fMRI_file}" >> ${concat_output_dir}/progress_update.txt
+fi
+
+if [[ ! -f "${concat_output_dir}/${fMRI_file}_perCVR_OptShift.nii.gz" || ! -f "${concat_output_dir}/${fMRI_file}_perCVR_OptShiftClip.nii.gz" ]]
+then
+  echo "-------------------------------------------------------------------"
+  echo "Making CVR maps (lag optimized) for ${fMRI_file}"
+  echo "-------------------------------------------------------------------"
+  echo "Making CVR maps (lag optimized) for ${fMRI_file}" >> ${concat_output_dir}/progress_update.txt
+  #Make percent CVR map with Lag (Coef/Mean*100) + mask to brain
+  3dcalc -a "${concat_output_dir}/${fMRI_file}_CO2-Coef_OptShift.nii.gz" -b "${concat_output_dir}/${fMRI_file}_Mean-Coef_OptShift.nii.gz" \
+  -c ${brain_mask_file} -expr "((a/b)*100)*c" -prefix "${concat_output_dir}/${fMRI_file}_perCVR_OptShift.nii.gz"
+  #Mask CVR map to remove boundaries + mask to brain
+  3dcalc -a "${concat_output_dir}/${fMRI_file}_perCVR_OptShift.nii.gz" -b "${concat_output_dir}/${fMRI_file}_Rsq_MAXid1_ClipMASK.nii.gz" \
+  -c ${brain_mask_file} -expr "a*b*c" -prefix "${concat_output_dir}/${fMRI_file}_perCVR_OptShiftClip.nii.gz"
+else
+  echo "-------------------------------------------------------------------"
+  echo "ALDEADY made CVR maps (lag optimized) for ${fMRI_file}"
+  echo "-------------------------------------------------------------------"
+  echo "ALDEADY made CVR maps (lag optimized) for ${fMRI_file}" >> ${concat_output_dir}/progress_update.txt
+fi

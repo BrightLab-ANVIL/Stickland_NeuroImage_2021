@@ -1,0 +1,181 @@
+#!/bin/bash
+
+# x.Threshold_Maps
+#
+# Assumes you have run x.3dDeconvolve_shifts or x.3dREMLfit_shifts, so filename outputs will be based on the outputs from these functions.
+#
+# Using these masks:
+#                   prefix_CO2-Tstat_NoShift, prefix_CO2-Tstat_OptShift, Rsq_MAXid1_ClipMASK
+# This code will threshold these files:
+#                   prefix_perCVR_NoShift, prefix_perCVR_OptShift, prefix_perCVR_OptShiftClip,
+#                   prefix_Lag_Sec_inv, prefix_Lag_Sec_inv_Clip, prefix_Lag_Sec_inv_rGM, prefix_Lag_Sec_inv_Clip_rGM,
+#
+# Uncorrected alpha set to 0.05
+#
+# NOTE: It would be very good to update the code so that the sidak correction can be
+#      calculated within this code, if nCO2shifts is given as an input, but
+#      doing maths in bash is hard.
+
+if [ $# -lt 4 ]
+then
+    echo "************************************************************************************************************"
+    echo "Insufficient arguments supplied"
+    echo "Input 1 should be the input directory to the unthresholded files (Concat directory). Default = pwd"
+    echo "Input 2 (required) should be the file prefix in this Concat directory (e.g. sub-01_task-BH_acq-mb4_bold_mc_brain)"
+    echo "Input 3 (required) should be the full path to the GM mask (e.g. path/sub-01_GM_mask.nii.gz)"
+    echo "Input 4 (required) should be the full path to the brain mask (e.g. path/sub-01_brain_mask.nii.gz)"
+    echo "Input 5 should be the new alpha threshold using the sidak correction: 1-(0.95^.(1/nCO2shifts)). Default = 5.1280e-04"
+    echo "Input 6 should be the number of time points (TRs) used in the GLM. Default = 390"
+    echo "Input 7 should be the output directory for the thresholded files. Default = pwd/output"
+    echo "*************************************************************************************************************"
+    exit
+fi
+
+#define inputs to the function
+input_dir=${1:-'.'}
+file_prefix=${2}
+GM_mask_file=${3}
+brain_mask_file=${4}
+sidak_alpha=${5:-5.1280e-04}
+tp=${6:-390}
+output_dir=${7:-'./output'}
+
+#If output directory is not present, make it
+if [ ! -d ${output_dir} ]
+then
+  mkdir ${output_dir}
+fi
+
+n_regressors=1 #as the t-stat is a partial statistic, relating to CO2 regressor vs all other regressors
+
+#define some parameters
+echo "Sidak alpha is ${sidak_alpha}"
+ndof=$((tp-n_regressors-1)) #N-k-1
+echo "ndof is $ndof"
+tstat=$( cdf -p2t fitt 0.05 ${ndof} )
+tstat=${tstat##* }
+echo "tstat is $tstat"
+tstat_opt=$( cdf -p2t fitt ${sidak_alpha} ${ndof} )
+tstat_opt=${tstat_opt##* }
+echo "tstat_opt is $tstat_opt"
+
+## Make lag maps relative to GM ##
+##################################
+tissue_lag=$( 3dmaskave -quiet -median -mask ${GM_mask_file} "${input_dir}/${file_prefix}_Lag_Sec_inv.nii.gz" )
+echo "-----------------------------------"
+echo "Median lag over GM is ${tissue_lag}"
+echo "-----------------------------------"
+echo "${file_prefix} ${tissue_lag}" >> ${output_dir}/GM_median_lags.txt
+
+if [[ ! -f "${output_dir}/${file_prefix}_Lag_Sec_inv_rGM.nii.gz" || ! -f "${output_dir}/${file_prefix}_Lag_Sec_inv_Clip_rGM.nii.gz" ]]
+then
+  echo "------------------------------"
+  echo "Making lag maps relative to GM"
+  echo "------------------------------"
+  3dcalc -a "${input_dir}/${file_prefix}_Lag_Sec_inv.nii.gz" -b ${brain_mask_file} -expr "(a-${tissue_lag})*b" -prefix "${output_dir}/${file_prefix}_Lag_Sec_inv_rGM.nii.gz"
+  3dcalc -a "${input_dir}/${file_prefix}_Lag_Sec_inv_Clip.nii.gz" -b "${input_dir}/${file_prefix}_Rsq_MAXid1_ClipMASK.nii.gz" -expr "(a-${tissue_lag})*b" -prefix "${output_dir}/${file_prefix}_Lag_Sec_inv_Clip_rGM.nii.gz"
+else
+  echo "------------------------------------"
+  echo "Lag maps relative to GM ALREADY made"
+  echo "------------------------------------"
+fi
+
+## Make T-stat masks ##
+#######################
+
+#make t-stat masks (not lag opt) - positive, negative, both
+if [[ ! -f "${output_dir}/${file_prefix}_CO2-Tstat_NoShift_PMASK.nii.gz" || ! -f "${output_dir}/${file_prefix}_CO2-Tstat_NoShift_NMASK.nii.gz" || ! -f "${output_dir}/${file_prefix}_CO2-Tstat_NoShift_MASK.nii.gz" ]]
+then
+  echo "---------------------------------------"
+  echo "Making T-stat masks (not lag optimized)"
+  echo "---------------------------------------"
+  3dcalc -a "${input_dir}/${file_prefix}_CO2-Tstat_NoShift.nii.gz" -expr "ispositive(a-$tstat)" -prefix "${output_dir}/${file_prefix}_CO2-Tstat_NoShift_PMASK.nii.gz"
+  3dcalc -a "${input_dir}/${file_prefix}_CO2-Tstat_NoShift.nii.gz" -expr "isnegative(a+$tstat)" -prefix "${output_dir}/${file_prefix}_CO2-Tstat_NoShift_NMASK.nii.gz"
+  3dcalc -a "${output_dir}/${file_prefix}_CO2-Tstat_NoShift_PMASK.nii.gz" -b "${output_dir}/${file_prefix}_CO2-Tstat_NoShift_NMASK.nii.gz" -expr "a+b" -prefix "${output_dir}/${file_prefix}_CO2-Tstat_NoShift_MASK.nii.gz"
+else
+  echo "---------------------------------------------"
+  echo "T-stat masks (not lag optimized) ALREADY made"
+  echo "---------------------------------------------"
+fi
+
+#make t-stat masks (lag opt)  - positive, negative, both
+if [[ ! -f "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_PMASK.nii.gz" || ! -f "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_NMASK.nii.gz" || ! -f "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_MASK.nii.gz" ]]
+then
+  echo "-----------------------------------"
+  echo "Making T-stat masks (lag optimized)"
+  echo "-----------------------------------"
+  3dcalc -a "${input_dir}/${file_prefix}_CO2-Tstat_OptShift.nii.gz" -expr "ispositive(a-$tstat)" -prefix "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_PMASK.nii.gz"
+  3dcalc -a "${input_dir}/${file_prefix}_CO2-Tstat_OptShift.nii.gz" -expr "isnegative(a+$tstat)" -prefix "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_NMASK.nii.gz"
+  3dcalc -a "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_PMASK.nii.gz" -b "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_NMASK.nii.gz" -expr "a+b" -prefix "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_MASK.nii.gz"
+else
+  echo "-----------------------------------------"
+  echo "T-stat masks (lag optimized) ALREADY made"
+  echo "-----------------------------------------"
+fi
+
+#make t-stat masks (lag opt, SIDAK)  - positive, negative, both
+if [[ ! -f "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_PMASK_sid.nii.gz" || ! -f "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_NMASK_sid.nii.gz" || ! -f "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_MASK_sid.nii.gz" ]]
+then
+  echo "------------------------------------------"
+  echo "Making T-stat masks (lag optimized, SIDAK)"
+  echo "------------------------------------------"
+  3dcalc -a "${input_dir}/${file_prefix}_CO2-Tstat_OptShift.nii.gz" -expr "ispositive(a-$tstat_opt)" -prefix "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_PMASK_sid.nii.gz"
+  3dcalc -a "${input_dir}/${file_prefix}_CO2-Tstat_OptShift.nii.gz" -expr "isnegative(a+$tstat_opt)" -prefix "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_NMASK_sid.nii.gz"
+  3dcalc -a "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_PMASK_sid.nii.gz" -b "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_NMASK_sid.nii.gz" -expr "a+b" -prefix "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_MASK_sid.nii.gz"
+else
+  echo "------------------------------------------------"
+  echo "T-stat masks (lag optimized, SIDAK) ALREADY made"
+  echo "------------------------------------------------"
+fi
+
+## Threhsold the files using the positive and negative Tstat mask ##
+####################################################################
+
+#threshold CVR (not lag opt)
+if [[ ! -f "${output_dir}/${file_prefix}_perCVR_NoShift_THR.nii.gz" ]]
+then
+  echo "-----------------------------------------------------"
+  echo "Thresholding CVR (not lag optimized) with T-stat mask"
+  echo "-----------------------------------------------------"
+  3dcalc -a "${input_dir}/${file_prefix}_perCVR_NoShift.nii.gz" -b "${output_dir}/${file_prefix}_CO2-Tstat_NoShift_MASK.nii.gz" -expr "a*b" -prefix "${output_dir}/${file_prefix}_perCVR_NoShift_THR.nii.gz"
+else
+  echo "---------------------------------------------------------------------"
+  echo "Thresholding of CVR (not lag optimized) with T-stat mask ALDREADY run"
+  echo "---------------------------------------------------------------------"
+fi
+
+#threshold CVR and Lag (clip and not clip)
+for Data_File in perCVR_OptShift perCVR_OptShiftClip Lag_Sec_inv Lag_Sec_inv_rGM Lag_Sec_inv_Clip Lag_Sec_inv_Clip_rGM
+do
+
+  if [ ! -f "${output_dir}/${file_prefix}_${Data_File}_THR.nii.gz" ]
+  then
+    echo "------------------------------------------"
+    echo "Thresholding ${Data_File} with T-stat mask"
+    echo "------------------------------------------"
+    3dcalc -a "${input_dir}/${file_prefix}_${Data_File}.nii.gz" -b "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_MASK.nii.gz" -expr "a*b" -prefix "${output_dir}/${file_prefix}_${Data_File}_THR.nii.gz"
+  else
+    echo "---------------------------------------------------------"
+    echo "Thresholding of ${Data_File} with T-stat mask ALREADY run"
+    echo "---------------------------------------------------------"
+  fi
+
+done
+
+#threshold CVR (lag opt and lag opt clipped, SIDAK)
+for Data_File in perCVR_OptShift perCVR_OptShiftClip Lag_Sec_inv Lag_Sec_inv_rGM Lag_Sec_inv_Clip Lag_Sec_inv_Clip_rGM
+do
+
+  if [ ! -f "${output_dir}/${file_prefix}_${Data_File}_THRsid.nii.gz" ]
+  then
+    echo "--------------------------------------------------"
+    echo "Thresholding ${Data_File} with T-stat mask (sidak)"
+    echo "--------------------------------------------------"
+    3dcalc -a "${input_dir}/${file_prefix}_${Data_File}.nii.gz" -b "${output_dir}/${file_prefix}_CO2-Tstat_OptShift_MASK_sid.nii.gz" -expr "a*b" -prefix "${output_dir}/${file_prefix}_${Data_File}_THRsid.nii.gz"
+  else
+    echo "-----------------------------------------------------------------"
+    echo "Thresholding of ${Data_File} with T-stat mask (sidak) ALREADY run"
+    echo "-----------------------------------------------------------------"
+  fi
+
+done
