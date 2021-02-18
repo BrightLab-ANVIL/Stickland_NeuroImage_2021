@@ -91,9 +91,7 @@ for subject_line in "${subject_list[@]}"; do
     echo "Transforming tissue masks to SBRef space"
     echo "----------------------------------------"
     for tissue_class in "${tissue_list[@]}"; do
-      flirt -in "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}.nii.gz" -ref "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet_ero.nii.gz" -applyxfm -init "${subject_output_dir}/${subject}_T1w_to_SBRef.mat" -out "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}_SBRef.nii.gz" -dof 6
-      # Threshold the mask afterwards (https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FLIRT/FAQ#How_do_I_transform_a_mask_with_FLIRT_from_one_space_to_another.3F)
-      fslmaths "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}_SBRef.nii.gz" -thr 0.5 -bin "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}_SBRef.nii.gz"
+      flirt -in "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}.nii.gz" -ref "${subject_output_dir}/${subject}_task-${MIDDLE_SCAN}_acq-mb4_bold_SBRef_bet_ero.nii.gz" -applyxfm -init "${subject_output_dir}/${subject}_T1w_to_SBRef.mat" -interp nearestneighbour -out "${subject_output_dir}/${subject}.anat/T1_fast_pve_1_${tissue_class}-MASK${pve_thr}_SBRef.nii.gz" -dof 6
     done #end tissue_class loop\
 
   fi
