@@ -1,18 +1,10 @@
-function Shift_hires_CO2regressor(fMRI_file,CO2_file,TR,extra_TRs_half,cut_TRs_start,cut_TRs_end,sf,nf,bulk_shift,save_bulk_hires,fine_shift,save_fine_hires,shift_unit_s,shift_max_s,prefix,output_dir)
+function Shift_hires_CO2regressor(fMRI_file,CO2_file,extra_TRs_half,cut_TRs_start,cut_TRs_end,bulk_shift,save_bulk_hires,fine_shift,save_fine_hires,shift_unit_s,shift_max_s,prefix,output_dir)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% NOTE: This code is written based on these inputs: sf of 1000Hz, nf of 40Hz and a TR of 1.2s.
-% It should work in principle for other inputs but this has not been tested.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% fMRI_file:        Full path to fMRI time-series (not demeaned).
+% fMRI_file:        Full path to fMRI average time-series (not demeaned).
 % CO2_file:         Full path to CO2 regressor, outputted from calc_CO2_regressor (not demeaned).
-% TR:               Repitition time of your fMRI scan, in seconds.
 % extra_TRs_half:   Extra number of TRs you exported within the CO2_file, before/after the scan.
 % cut_TRs_start:    Number of TRs to cut from the start of the fMRI input data (this can be 0).
 % cut_TRs_end:      Number of TRs to cut from the end of the fMRI input data (this can be 0).
-% sf:               Sampling frequency of the CO2_file.
-% nf:               New frequency to down/up sample the CO2/fMRI time-series to, before doing the cross correlation.
 %
 % bulk_shift:       Do you want to run bulk-shift? 1 for yes, 0 for no. 
 % save_bulk_hires:  1 for yes, 0 for no. By default, the low-res bulk shifted regressor is saved. 
@@ -28,6 +20,16 @@ function Shift_hires_CO2regressor(fMRI_file,CO2_file,TR,extra_TRs_half,cut_TRs_s
 % Negative shift means CO2 leads fMRI. Positive shift means CO2 lags fMRI.
 % This is inverted later on in the analysis pipeline.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% NOTE: This code is written based on these inputs: sf of 1000Hz, nf of 40Hz and a TR of 1.2s.
+% It should work in principle for other inputs but this has not been tested.
+% There are definitely more efficient ways of making theses lagged-regressors :) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+sf=1000; % sampling frequency of the CO2_file in Hz
+nf=40; %New frequency to down/up sample the CO2/fMRI time-series to, before doing the cross correlation 
+%40Hz is pretty arbitrary - just to make the high-res regressor easier to manage because 1000Hz is overkill
+TR = 1.2; % Repitition time of your fMRI scan, in seconds.
 %% 
 
 %%%%%%%%%%%%%%%%%%%%%%%

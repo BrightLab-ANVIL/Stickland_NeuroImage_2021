@@ -17,6 +17,8 @@ RestDuration = 480; end_exp_key = 'escape'
 
 ## ANALYSIS CODE (THIS REPO)
 
+**PLEASE NOTE**: this analysis code has been shared alongside the peer-reviewed manuscript, to be transparent with what analysis was performed in order to produce the results presented in this manuscript. The code is not written as a package that is overly generalizable to different study set-ups. If you use this code, or parts of it, an acknowledgment would be welcome. You are welcome to use and edit it for your data set-up. If you are looking for citable fMRI pre-processing pipelines check out something like fMRIprep (https://github.com/nipreps/fmriprep). For a package that processes physiological data, to prepare them for analysis with fMRI, see the physiopy community github (https://github.com/physiopy). Specifically, for python code that creates and implements lagged regressors for a GLM framework, to create lag-optimized CVR maps (much faster than this code!) see: https://github.com/smoia/phys2cvr (in development).
+
 ### Step 1 - x.PreProc_MRI
 
 Used the default options (except for input and output directories).
@@ -120,5 +122,3 @@ Input 3 = Output file from PreProc_MRI \
 Input 4 = Output file from PreProc_MRI \
 Input 5 = 5.1280e-04 \
 Input 6 = 390
-
-
