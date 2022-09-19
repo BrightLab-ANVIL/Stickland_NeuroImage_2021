@@ -26,6 +26,15 @@
         "ideas",
         "review"
       ]
+    },
+    {
+      "login": "BrightMG",
+      "name": "Molly Bright",
+      "avatar_url": "https://avatars.githubusercontent.com/u/32640425?v=4",
+      "profile": "brightlab.northwestern.edu",
+      "contributions": [
+        "ideas"
+      ]
     }
   ],
   "contributorsPerLine": 7,
