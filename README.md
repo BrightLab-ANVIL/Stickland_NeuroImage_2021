@@ -1,5 +1,5 @@
 *A practical modification to a resting state fMRI protocol for improved characterization of cerebrovascular function \
-DOI: https://doi.org/10.1101/2021.02.15.431289*
+DOI: https://doi.org/10.1016/j.neuroimage.2021.118306*
 
 ## BREATHING TASK CODE: https://github.com/RayStick/BreathingTasks_PsychoPy
 
