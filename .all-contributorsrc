@@ -15,6 +15,26 @@
         "review",
         "ideas"
       ]
+    },
+        {
+      "login": "RayStick",
+      "name": "Rachael Stickland",
+      "avatar_url": "https://avatars.githubusercontent.com/u/50215726?v=4",
+      "profile": "http://linkedin.com/in/rstickland-phd",
+      "contributions": [
+        "code",
+        "ideas",
+        "doc"
+      ]
+    },
+    {
+      "login": "BrightMG",
+      "name": "Molly Bright",
+      "avatar_url": "https://avatars.githubusercontent.com/u/32640425?v=4",
+      "profile": "http://brightlab.northwestern.edu",
+      "contributions": [
+        "ideas"
+      ]
     }
   ],
   "contributorsPerLine": 7,
