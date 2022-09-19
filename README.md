@@ -1,6 +1,6 @@
 # A practical modification to a resting state fMRI protocol for improved characterization of cerebrovascular function (_https://doi.org/10.1016/j.neuroimage.2021.118306_)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 ## Breathing task code 
@@ -141,6 +141,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center"><a href="linkedin.com/in/rstickland-phd"><img src="https://avatars.githubusercontent.com/u/50215726?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Rachael Stickland</b></sub></a><br /><a href="https://github.com/BrightLab-ANVIL/Stickland_NeuroImage_2021/commits?author=RayStick" title="Code">💻</a> <a href="#ideas-RayStick" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/BrightLab-ANVIL/Stickland_NeuroImage_2021/commits?author=RayStick" title="Documentation">📖</a></td>
       <td align="center"><a href="https://github.com/kristinazvolanek"><img src="https://avatars.githubusercontent.com/u/54590158?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Kristina Zvolanek</b></sub></a><br /><a href="#ideas-kristinazvolanek" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/BrightLab-ANVIL/Stickland_NeuroImage_2021/pulls?q=is%3Apr+reviewed-by%3Akristinazvolanek" title="Reviewed Pull Requests">👀</a></td>
       <td align="center"><a href="brightlab.northwestern.edu"><img src="https://avatars.githubusercontent.com/u/32640425?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Molly Bright</b></sub></a><br /><a href="#ideas-BrightMG" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center"><a href="https://github.com/smoia"><img src="https://avatars.githubusercontent.com/u/35300580?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Stefano Moia</b></sub></a><br /><a href="#ideas-smoia" title="Ideas, Planning, & Feedback">🤔</a></td>
     </tr>
   </tbody>
 </table>
