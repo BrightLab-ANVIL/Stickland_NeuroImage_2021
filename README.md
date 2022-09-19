@@ -1,7 +1,9 @@
-*A practical modification to a resting state fMRI protocol for improved characterization of cerebrovascular function \
-DOI: https://doi.org/10.1016/j.neuroimage.2021.118306*
+# A practical modification to a resting state fMRI protocol for improved characterization of cerebrovascular function (_https://doi.org/10.1016/j.neuroimage.2021.118306_)
 
-## BREATHING TASK CODE: https://github.com/RayStick/BreathingTasks_PsychoPy
+## Breathing task code 
+
+The breathing task code can be found in this repo: https://github.com/RayStick/BreathingTasks_PsychoPy. 
+The settings used for the breathing task code are listed below.
 
 ### Breath_Hold.py
 
@@ -15,9 +17,9 @@ scan_trigger = 5; doRest = 2; tResting = 480; trialnum = 2; tStartRest = 28; tGe
 
 RestDuration = 480; end_exp_key = 'escape'
 
-## ANALYSIS CODE (THIS REPO)
+## ANALYSIS CODE
 
-**PLEASE NOTE**: this analysis code has been shared alongside the peer-reviewed manuscript, to be transparent with what analysis was performed in order to produce the results presented in this manuscript. The code is not written as a package that is overly generalizable to different study set-ups. If you use this code, or parts of it, an acknowledgment would be welcome. You are welcome to use and edit it for your data set-up. If you are looking for citable fMRI pre-processing pipelines check out something like fMRIprep (https://github.com/nipreps/fmriprep). For a package that processes physiological data, to prepare them for analysis with fMRI, see the physiopy community github (https://github.com/physiopy). 
+**PLEASE NOTE**: the analysis code in this repository has been shared alongside the peer-reviewed manuscript in order to be transparent with what analysis was performed to produce the results. The code in this repository is not written as a package that is generalizable to different study set-ups, and unfortunately we do not have the permission to share the data. If you use this code, or parts of it, an acknowledgment would be welcome. You are welcome to use and edit it for your data set-up. If you are looking for citable fMRI pre-processing pipelines check out something like fMRIprep (https://github.com/nipreps/fmriprep). For a package that processes physiological data, to prepare them for analysis with fMRI, see the physiopy community github (https://github.com/physiopy). 
 
 ### Step 1 - x.PreProc_MRI
 
